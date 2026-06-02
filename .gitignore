@@ -1,0 +1,38 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Keys and secrets
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+credentials.json
+
+# Local config
+*.local.js
+*.local.yaml
+*.local.yml
+config.local.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Windows reserved names
+nul
+NUL
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
