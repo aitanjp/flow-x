@@ -1,6 +1,6 @@
 ---
 name: flow-go
-description: flow-x 统一入口 Orchestrator。解析用户意图，自动匹配阶段，执行 Artifact Preflight Gate，估算 Token 预算，加载必要规则与工件，路由到对应子 skill 执行。Use when 用户说"开始做某事/继续/审查/测试/设计/换风格/健康检查/扫描代码/架构梳理"等任何与 flow-x 流程相关的意图，或需要自动管理 change 生命周期时。
+description: flow-x 统一入口 Orchestrator。解析用户意图，自动匹配阶段，执行 Artifact Preflight Gate，估算 Token 预算，加载必要规则与工件，路由到对应子 skill 执行。支持 GitNexus MCP 可用性检测，GitNexus 可用时子 skill 自动优先使用 MCP 工具。Use when 用户说"开始做某事/继续/审查/测试/设计/换风格/健康检查/扫描代码/架构梳理"等任何与 flow-x 流程相关的意图，或需要自动管理 change 生命周期时。
 ---
 
 # flow-go — flow-x 统一入口
@@ -106,6 +106,23 @@ Token 预算估计：
 
 **触发**：进入 0-change 之前必跑。
 
+**5.0 GitNexus MCP 可用性检测（必跑 · 在所有检测前）**
+
+尝试调用 `gitnexus_impact`（target 取项目入口文件名或主类名，direction="upstream"）：
+- 返回有效结果 → GitNexus 可用，记录到 STATE.md `gitnexus_available: true`
+- 返回错误或空 → GitNexus 不可用，记录 `gitnexus_available: false`
+- 返回 stale 警告 → 提示用户跑 `npx gitnexus analyze` 刷新
+
+**GitNexus 可用时的收益**：
+- flow-intel-scan → 语义级模块/抽象扫描（取代 grep）
+- flow-architect → Community 模块 + 依赖图（取代 ls/find）
+- flow-dev → 既有抽象搜索 + 变更影响分析（取代 grep 引用图）
+- flow-review → 循环依赖检测（取代手绘依赖图）
+- flow-health → 未用导出检测（取代 grep fallback）
+- flow-design → 既有架构对齐（取代 grep 模块定位）
+
+**路由声明中必须声明 GitNexus 状态**。
+
 探测以下 AI 上下文文档（按优先级）：
 - `CONTEXT.md`（仓库根 / `.specs/`）— flow-x 自己
 - `AGENTS.md`（仓库根）— OpenAI Codex
@@ -157,6 +174,7 @@ Token 预算估计：
 ```
 路由：<阶段，例如 0-change>
 Change-ID：<id>（已自动生成 / 已恢复活跃 change：<existing-id>）
+GitNexus MCP：<可用 / 不可用 / 索引过期 · 建议刷新>
 已加载：
    - <file1>（全读，N 行）
    - <file2>（全读，N 行）

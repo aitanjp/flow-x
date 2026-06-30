@@ -1,6 +1,6 @@
 ---
 name: flow-design
-description: 技术设计师。把 REQUIREMENT.md 转化为可执行的技术设计 DESIGN.md，含技术栈预选（5~6 卡让用户选）、既有架构对齐（brownfield）、技术决策清单（备选+理由+代价）、数据流/架构图、ADR、风险分析和架构沉淀建议。Use when 用户确认 REQUIREMENT.md 后需要进入技术设计阶段，或需要技术选型/架构评审时。
+description: 技术设计师。把 REQUIREMENT.md 转化为可执行的技术设计 DESIGN.md，含技术栈预选（5~6 卡让用户选）、既有架构对齐（brownfield）、技术决策清单（备选+理由+代价）、数据流/架构图、ADR、风险分析和架构沉淀建议。优先使用 GitNexus MCP 定位既有模块和抽象，grep 作为回退。Use when 用户确认 REQUIREMENT.md 后需要进入技术设计阶段，或需要技术选型/架构评审时。
 ---
 
 # flow-design — 技术设计
@@ -19,6 +19,8 @@ description: 技术设计师。把 REQUIREMENT.md 转化为可执行的技术设
 - 命中 + ARCHITECTURE.md 存在 → 检查 ADR 冲突，提示在 §1 显式声明 supersede 关系
 - 命中 + ARCHITECTURE.md 不存在 → 反问用户：先跑 flow-architect / 继续但强制加 ADR 声明 / 重判
 - 未命中 → 直接进步骤 0
+
+**GitNexus 路径（优先）**：调用 `gitnexus_impact({target: "ADR 涉及的关键符号", direction: "upstream"})` 检查影响范围，确认是否会与现有 ADR 冲突。
 
 ### 0. 技术栈预选（独立一条消息，等用户选定）
 
@@ -42,7 +44,15 @@ description: 技术设计师。把 REQUIREMENT.md 转化为可执行的技术设
 
 #### 0.5.1 列出本次 change 会触碰的既有模块
 
-基于 REQUIREMENT.md 和 CONTEXT.md，grep 出实际会涉及的模块：
+**GitNexus 路径（优先）**：
+1. 调用 `gitnexus_query(query="<REQUIREMENT 关键概念>", goal="find affected modules", task_context="<change描述>")` → 返回 affected processes 和 process_symbols
+2. 调用 `gitnexus_cypher` 查询涉及的 Community/模块：
+   ```
+   MATCH (c:Community) WHERE c.keywords CONTAINS "<关键词>" RETURN c.heuristicLabel, c.symbolCount
+   ```
+3. 从返回结果直接提取：触碰模块（既有 · 来自 GitNexus） / 新增模块 / 禁动清单
+
+**grep 回退**：基于 REQUIREMENT.md 和 CONTEXT.md，grep 出实际会涉及的模块：
 - 触碰模块（既有 · 来自 grep）
 - 新增模块
 - 禁动清单（与本次无关，AI 不许"顺手"碰）

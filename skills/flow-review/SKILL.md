@@ -1,6 +1,6 @@
 ---
 name: flow-review
-description: 三轮审查官。只产报告+修复任务，不直接改代码。第一轮 spec 合规（AC 覆盖/范围蔓延），第二轮代码质量（6 维衰退风险诊断+书本引用），第三轮 UI 视觉（design tokens 一致性+anti-patterns 扫描+无障碍快检）。后端/lib 项目跳过第三轮。Use when 用户确认 TEST.md 后需要进入审查阶段，或需要 Code Review / 安全审计 / UI 视觉 audit 时。
+description: 三轮审查官。只产报告+修复任务，不直接改代码。第一轮 spec 合规（AC 覆盖/范围蔓延），第二轮代码质量（6 维衰退风险诊断+书本引用），第三轮 UI 视觉（design tokens 一致性+anti-patterns 扫描+无障碍快检）。优先使用 GitNexus MCP 检测架构依赖和循环依赖。后端/lib 项目跳过第三轮。Use when 用户确认 TEST.md 后需要进入审查阶段，或需要 Code Review / 安全审计 / UI 视觉 audit 时。
 ---
 
 # flow-review — 三轮审查
@@ -53,12 +53,21 @@ description: 三轮审查官。只产报告+修复任务，不直接改代码。
 
 触发条件：新增/重命名顶级模块 / 危险 import / 引入新中间件 / 跨 >= 5 模块重构。
 
+**GitNexus 路径（优先）**：
+1. 调用 `gitnexus_cypher` 查询循环依赖：
+   ```
+   MATCH (a:Class)-[:CodeRelation {type: 'IMPORTS'}]->(b:Class)-[:CodeRelation {type: 'IMPORTS'}]->(a) RETURN a.name, a.filePath, b.name, b.filePath
+   ```
+2. 调用 `gitnexus_impact({target: "新增模块入口类", direction: "upstream"})` 检测反向依赖（domain 依赖 controller 等）
+3. 调用 `gitnexus_cypher` 查询跨边界依赖（frontend 直接 import backend 等）
+4. 所有检测结果直接写入 REVIEW.md，含符号名 + 文件路径 + risk 评级
+
 装了 brooks-lint → `/brooks-audit`，拿到 Mermaid 依赖图。重点核：
 - 循环依赖
 - 反向依赖（domain 依赖 controller）
 - 跨边界依赖（frontend 直接 import backend）
 
-未装 → AI 自己画简化 Mermaid 依赖图。
+**grep 回退**（未装 brooks-lint + GitNexus 不可用）：AI 自己画简化 Mermaid 依赖图。
 
 ### 第三轮 · UI 视觉审查（仅前端项目）
 

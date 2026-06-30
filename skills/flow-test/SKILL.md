@@ -1,6 +1,6 @@
 ---
 name: flow-test
-description: 五轮测试金字塔执行器。基于 REQUIREMENT.md 的 AC 和 DESIGN.md 的技术栈，执行功能/性能/安全/兼容/可观测五轮测试，每轮按项目类型可裁剪，输出 TEST.md 报告。Use when 用户确认所有 DEV 任务完成后需要进入测试阶段，或需要补测试/覆盖率审计时。
+description: 五轮测试金字塔执行器。基于 REQUIREMENT.md 的 AC 和 DESIGN.md 的技术栈，执行功能/性能/安全/兼容/可观测五轮测试，每轮按项目类型可裁剪，输出 TEST.md 报告。GitNexus MCP 可用时用于定位测试应覆盖的执行流和影响符号。Use when 用户确认所有 DEV 任务完成后需要进入测试阶段，或需要补测试/覆盖率审计时。
 ---
 
 # flow-test — 五轮测试金字塔
@@ -31,6 +31,8 @@ description: 五轮测试金字塔执行器。基于 REQUIREMENT.md 的 AC 和 D
 
 #### 1.1 测试矩阵
 每条 AC 映射到测试用例。强制：每条 AC >= 1 条覆盖。空缺必须解释。
+
+**GitNexus 路径（可选）**：对每条 AC 涉及的业务概念调用 `gitnexus_query(query="<AC 关键概念>", goal="find execution flows to cover in tests")`，从返回的 affected_processes 中提取测试应覆盖的执行流路径，确保端到端路径都有测试覆盖。
 
 #### 1.2 UAT 脚本
 无法自动化的 AC 写 UAT 脚本（前置/步骤/期望/通过失败）。

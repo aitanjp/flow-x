@@ -70,6 +70,8 @@ trigger:
 
 **强制**输出"动 / 不动"清单：
 
+**GitNexus 路径（可选）**：对涉及的 UI 组件调用 `gitnexus_impact({target: "组件名", direction: "upstream"})`，确认消费者只访问视觉属性（颜色/间距/字体），不访问逻辑属性（props/事件/state）。如果有消费者依赖了逻辑属性 → 立标 🟡 Major。
+
 | 类别 | 动 | 不动 |
 |---|---|---|
 | Design tokens（CSS vars / theme）| ✅ 全替换 | — |

@@ -34,6 +34,9 @@ description: UI 美学导演。为前端项目产出 UI-DESIGN.md，含美学北
 
 优先读代码 >> 看截图。按顺序提取：
 1. Token 源：grep tokens / theme / tailwind.config / :root
+
+**GitNexus 路径（可选）**：调用 `gitnexus_query(query="CSS variables theme tokens design", goal="find existing visual token definitions")` 精确定位 token 源文件位置。
+
 2. 实际色彩比例：打开 3-5 个代表页面记录
 3. 交互反馈语言：grep hover / focus / transition
 4. 动效语言：grep cubic-bezier / ease- / duration-

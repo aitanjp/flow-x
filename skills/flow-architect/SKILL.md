@@ -1,6 +1,6 @@
 ---
 name: flow-architect
-description: 项目级架构梳理师。建立或重构 `.specs/ARCHITECTURE.md`，包含模块图、ADR 列表、跨模块契约、依赖规则和容量边界。Use when 用户说"建立架构/架构梳理/重构架构/architect/重审 ADR/画架构图"，或项目首次使用 flow-x 且需要项目级架构文档时。不属于任何 change，不写 CHANGE.md。
+description: 项目级架构梳理师。建立或重构 `.specs/ARCHITECTURE.md`，包含模块图、ADR 列表、跨模块契约、依赖规则和容量边界。优先使用 GitNexus MCP 提取模块社区、依赖关系和 API 路由，grep 作为回退。Use when 用户说"建立架构/架构梳理/重构架构/architect/重审 ADR/画架构图"，或项目首次使用 flow-x 且需要项目级架构文档时。不属于任何 change，不写 CHANGE.md。
 ---
 
 # flow-architect — 项目级架构梳理
@@ -8,6 +8,19 @@ description: 项目级架构梳理师。建立或重构 `.specs/ARCHITECTURE.md`
 ## Goal
 
 作为 Chief Architect，只产架构文档，不动业务代码。和用户协作完成 4-6 步的项目级架构梳理。
+
+## GitNexus MCP 集成策略
+
+**原则**：架构梳理需要理解模块边界、依赖方向和跨模块契约。GitNexus MCP 提供语义级模块社区和依赖图，远优于 grep 字面级扫描。
+
+| 架构步骤 | GitNexus MCP 工具 | 回退 grep 命令 |
+|---|---|---|
+| 模块清单（步骤 3.1） | `gitnexus_cypher`（Community 节点） | `ls src/` + `find src -type d` |
+| 依赖规则（步骤 3.2） | `gitnexus_impact`（跨模块调用链） | `grep -rn "^import"` |
+| 跨模块契约（步骤 5.1） | `gitnexus_route_map`（API 路由映射） | `grep -rn "@Route\|@Controller"` |
+| 执行流梳理 | `gitnexus_query`（搜索关键业务流程） | — |
+
+**可用性检测**：开始步骤 2 前调用 `gitnexus_impact` 探测入口类。可用 → 优先 MCP；不可用 → 回退 grep。
 
 ## Trigger Scenarios
 
@@ -68,8 +81,17 @@ A-architect 模式：<A · 首跑 / B · 重构>
 
 ### 步骤 3 · 模块清单 + 依赖规则（必跑 · 老项目核心）
 
-#### 3.1 grep 出实际模块
+#### 3.1 模块发现
 
+**GitNexus 路径（优先）**：
+1. 调用 `gitnexus_cypher`：
+   ```
+   MATCH (c:Community) RETURN c.heuristicLabel, c.symbolCount, c.keywords, c.description, c.cohesion
+   ```
+2. 每个 Community 即一个功能模块，字段自动包含：路径（从 keywords 推断）、职责（description）、符号数、内聚度
+3. 调用 `gitnexus_impact({target: "模块入口类", direction: "downstream", maxDepth: 2})` 获取模块间依赖方向
+
+**grep 回退**：
 ```
 ls src/                               # 顶层结构
 find src -type d -maxdepth 3          # 深一层
@@ -109,9 +131,11 @@ grep -rn "^import" src/ | head -200   # 抽样依赖关系
 
 ### 步骤 5 · 跨模块契约（按需）
 
-#### 5.1 公共 API · grep 路由
+#### 5.1 公共 API · 跨模块契约
 
-grep 路由定义，整理成路由表。只列 public API，变更频繁的 / 内部 API 不必全列。
+**GitNexus 路径（优先）**：调用 `gitnexus_route_map` 获取完整路由映射（含 handler 文件、middleware wrapper 链、消费者）。每个路由即一条跨模块契约。
+
+**grep 回退**：grep 路由定义，整理成路由表。只列 public API，变更频繁的 / 内部 API 不必全列。
 
 #### 5.2 事件总线 / Schema · 仅在涉及时跑
 

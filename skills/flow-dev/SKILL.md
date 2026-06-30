@@ -1,6 +1,6 @@
 ---
 name: flow-dev
-description: 单任务开发执行器。在 fresh context 中按 TDD（RED→GREEN→REFACTOR）执行 TASK.md 中的一个任务，grep 沿用既有抽象，扫描 LESSONS.md 防重复失败，UI 任务额外检查 design tokens 和 anti-patterns，Schema 变更生成可逆迁移，破坏性变更走 grep 引用图+反问协议，提交前跑 diff 边界 verify 和 6 维 self-review。Use when 用户说"执行 T<NN>/跑 T<NN>/do T<NN>/继续"，或需要实现 TASK.md 中的某个任务时。
+description: 单任务开发执行器。在 fresh context 中按 TDD（RED→GREEN→REFACTOR）执行 TASK.md 中的一个任务，优先使用 GitNexus MCP 搜索既有抽象和做变更影响分析，grep 作为回退。Schema 变更生成可逆迁移，破坏性变更走影响分析+反问协议，提交前跑 diff 边界 verify 和 6 维 self-review。Use when 用户说"执行 T<NN>/跑 T<NN>/do T<NN>/继续"，或需要实现 TASK.md 中的某个任务时。
 ---
 
 # flow-dev — 单任务开发
@@ -8,6 +8,22 @@ description: 单任务开发执行器。在 fresh context 中按 TDD（RED→GRE
 ## Goal
 
 在 fresh context 中执行 TASK.md 中的一个任务，保证代码质量、边界控制和可追溯性。
+
+## GitNexus MCP 集成策略
+
+**原则**：修改代码前先查影响，写新代码前先找既有抽象。GitNexus 可用时优先使用 MCP，不可用时回退到 grep。
+
+| 开发步骤 | GitNexus MCP 工具 | 回退 grep 命令 |
+|---|---|---|
+| 沿用既有抽象（步骤 1.4） | `gitnexus_query`（语义搜索 HTTP/DAO/状态管理等） | `grep -rn "axios\|fetch\|Repository"` |
+| 破坏性变更影响（步骤 1.8） | `gitnexus_impact`（blast radius：d=1 直接调用者、d=2 间接影响） | `grep引用图` |
+| 修改前必查影响 | `gitnexus_impact({target: "symbolName", direction: "upstream"})` | — |
+| 提交前变更检测（步骤 5） | `gitnexus_detect_changes`（affected processes + risk） | `git diff --name-only` |
+| 符号重命名 | `gitnexus_rename`（图+文本协同重命名） | find-and-replace |
+
+**强制规则（AGENTS.md 继承）**：
+- **修改任何符号前必须跑 `gitnexus_impact`**。返回 HIGH/CRITICAL → 必须警告用户
+- **提交前必须跑 `gitnexus_detect_changes`**。验证变更只影响预期符号和执行流
 
 ## Workflow
 
@@ -25,9 +41,20 @@ AI 不允许自行编造临时 TASK。缺字段必须反问用户或回到 flow-
 
 从 TASK.md 取出对应 task 块，读懂 action/files/verify/done。有歧义停下来反问。
 
-### 1.4 沿用既有抽象 grep（强制 · R6.4）
+### 1.4 沿用既有抽象（强制 · R6.4）
 
-写新代码前 grep 同类抽象。针对 action 中每个能力执行 grep：
+写新代码前搜索同类抽象。**GitNexus 可用时优先用 MCP，不可时用 grep**。
+
+**GitNexus 路径（优先）**：对 action 中每个能力调用 `gitnexus_query`：
+- HTTP 请求：`gitnexus_query(query="HTTP request fetch axios", goal="find existing HTTP client abstraction", task_context="<当前task描述>")`
+- 日期格式化：`gitnexus_query(query="date format parse", goal="find existing date utility")`
+- 状态管理：`gitnexus_query(query="state store management", goal="find existing state pattern")`
+- Repository/DAO：`gitnexus_query(query="Repository DAO entity database", goal="find existing data access pattern")`
+- 错误处理：`gitnexus_query(query="Error exception handler boundary", goal="find existing error pattern")`
+
+返回 `process_symbols` 含文件位置 + 模块归属，直接定位既有实现。
+
+**grep 回退**：针对 action 中每个能力执行 grep：
 - HTTP 请求：`grep -rn "axios\|fetch\|httpClient\|apiClient" src/`
 - 日期格式化：`grep -rn "format.*[Dd]ate\|date.*[Ff]ormat" src/utils src/lib`
 - 状态管理：看 package.json
@@ -35,7 +62,7 @@ AI 不允许自行编造临时 TASK。缺字段必须反问用户或回到 flow-
 - 错误处理：`grep -rn "ErrorBoundary\|errorHandler\|class.*Error" src/`
 - 自定义 hooks：`find src -name 'use*.ts*'`
 
-**必须**把 grep 命令和结果贴入 SUMMARY「6 维自查」段。禁止"项目里好像没有"——必须有 grep 作证。
+**必须**把搜索命令和结果贴入 SUMMARY「6 维自查」段。禁止"项目里好像没有"——必须有证据。
 
 ### 1.5 扫 LESSONS（强制 · R1.8）
 
@@ -74,13 +101,23 @@ AI 不允许自行编造临时 TASK。缺字段必须反问用户或回到 flow-
 判定：删除既有代码 >= 5 行 / 改公共导出签名 / 改公共 API / 删除文件或重命名导出符号。
 
 命中时必须：
-1. **grep 引用图**：对被删/改签名的符号执行 grep，贴出完整结果
-2. **列出影响清单**：含直接调用和间接影响
-3. **反问用户**：停止，贴出结果让用户选处理方式（直接删除/留兼容期/写 codemod/不删）
-4. **回归测试覆盖**：确保旧路径有测试
-5. **写入 SUMMARY「破坏性变更」段**
+1. **GitNexus 影响分析（优先）**：对被删/改签名的符号调用 `gitnexus_impact({target: "symbolName", direction: "upstream", maxDepth: 3})`，获取完整 blast radius（d=1 直接调用者 / d=2 间接影响 / d=3 需测试 / affected_processes / risk 评级）。贴出完整结果。
+2. **grep 引用图回退**：对被删/改签名的符号执行 grep，贴出完整结果。
+3. **列出影响清单**：含直接调用和间接影响（来自 GitNexus 或 grep）
+4. **反问用户**：停止，贴出结果让用户选处理方式（直接删除/留兼容期/写 codemod/不删）。**GitNexus 返回 HIGH/CRITICAL risk → 必须警告用户**
+5. **回归测试覆盖**：确保旧路径有测试
+6. **写入 SUMMARY「破坏性变更」段**
 
 不必走本协议的情况：重构内部实现（导出不变）/ 加可选参数保持兼容 / 删 < 5 行实现细节（无外部引用）。
+
+### 1.9 修改符号前强制影响检查（新增 · 来自 AGENTS.md）
+
+**每次准备修改一个函数、类或方法前**，必须先调用 `gitnexus_impact({target: "symbolName", direction: "upstream"})` 检查 blast radius：
+- 返回 LOW → 可继续
+- 返回 MEDIUM → 在执行计划中声明影响
+- 返回 HIGH/CRITICAL → **必须警告用户**，确认后才可继续
+
+**GitNexus 不可用时**：此步跳过，但必须在 SUMMARY 中标注"GitNexus 不可用，未做符号级影响检查"。
 
 ### 2. TDD 优先（默认开启）
 
@@ -109,15 +146,23 @@ RED → GREEN → REFACTOR：
 
 ### 5. 提交前 diff 边界 verify（强制 · R6.5）
 
-1. `git diff --name-only` 列出实际改动文件
-2. 与 TASK.md write_files 比对
-3. 有超出 → 停下来：撤销/扩范围/拆新 task
-4. 结果写入 SUMMARY「越界检查」段
+1. **GitNexus 路径（优先）**：调用 `gitnexus_detect_changes(scope="unstaged")`，获取 changed_symbols + affected_processes + risk summary。验证只影响预期符号和执行流。
+2. **git 回退**：`git diff --name-only` 列出实际改动文件
+3. 与 TASK.md write_files 比对
+4. 有超出 → 停下来：撤销/扩范围/拆新 task
+5. 结果写入 SUMMARY「越界检查」段
 
 ### 5.5 原子提交（R4.1）
 
 格式：`<type>(<change-id>): <task-id> <subject>`
 代码 + 测试同次或紧邻提交。
+
+### 5.6 符号重命名专用路径（新增）
+
+需要重命名符号时，**禁止用 find-and-replace**。必须使用 `gitnexus_rename`：
+- `gitnexus_rename(symbol_name="oldName", new_name="newName", dry_run=true)` → 先预览所有涉及文件
+- 确认后 `dry_run=false` 执行
+- **GitNexus 不可用时**：使用 LSP rename 功能或逐文件 SearchReplace，禁止全局正则替换
 
 ### 6. 写 SUMMARY
 
@@ -154,8 +199,10 @@ RED → GREEN → REFACTOR：
 - 发现需求/设计有问题 → 不要自己改 REQUIREMENT/DESIGN，停下来开新 CHANGE
 - Schema 变更必伴随迁移文件。只改 model 不生迁移就提交 → 违规，AI 自己回滚
 - 破坏性变更必走 1.8 协议
-- 写代码前必 grep 同类抽象
-- 提交前必跑 diff 边界 verify
+- **修改符号前必跑 gitnexus_impact**（HIGH/CRITICAL 必警告用户）
+- 写代码前必搜索同类抽象（GitNexus query 或 grep）
+- 提交前必跑 diff 边界 verify（GitNexus detect_changes 或 git diff）
+- **符号重命名禁止 find-and-replace**，必用 gitnexus_rename 或 LSP
 - 禁止用 mock 屏蔽真实失败
 - 禁止"应该可以工作"——必须实际跑过 verify
 - 发现需要扩大范围 → 停下来要求更新 TASK.md
@@ -168,13 +215,15 @@ RED → GREEN → REFACTOR：
 - [ ] 6 维 self-review 跑了，🔴 已修，🟡 已记
 - [ ] 涉及 schema 变更已生成迁移文件且含 up+down
 - [ ] 前端任务走了 1.6：读了 UI-DESIGN.md + frontend-rules；交付前过第 10 节清单
-- [ ] 沿用既有抽象 grep 跑了，结果贴入 SUMMARY
-- [ ] 破坏性变更走了 1.8 协议
-- [ ] 提交前 diff 边界 verify 跑了，结果贴入 SUMMARY
+- [ ] 沿用既有抽象搜索跑了（GitNexus query 或 grep），结果贴入 SUMMARY
+- [ ] 破坏性变更走了 1.8 协议（GitNexus impact 或 grep引用图）
+- [ ] **修改符号前走了 1.9 影响检查**（GitNexus 可用时必须跑，不可用时标注"未检查"）
+- [ ] 提交前 diff 边界 verify 跑了（GitNexus detect_changes 或 git diff），结果贴入 SUMMARY
 - [ ] SUMMARY.md 写完了
 - [ ] TASK.md 对应任务已勾选
 - [ ] 没有改动 REQUIREMENT.md / DESIGN.md
 - [ ] 没有越界改其他任务的文件
+- [ ] 符号重命名使用了 gitnexus_rename（而非 find-and-replace）
 
 ## Resources
 
@@ -183,3 +232,4 @@ RED → GREEN → REFACTOR：
 - `references/LESSONS.md` — 跨任务失败知识库模板
 - `references/ui-anti-patterns.md` — 反 AI-slop 清单
 - `references/frontend-engineer-rules-excerpt.md` — 前端实现硬规则（第 1+2+10 节必跑）
+- GitNexus MCP 工具：`gitnexus_query` / `gitnexus_impact` / `gitnexus_detect_changes` / `gitnexus_rename` / `gitnexus_context`

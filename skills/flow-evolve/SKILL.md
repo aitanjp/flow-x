@@ -3,6 +3,7 @@ name: flow-evolve
 description: >
   [project] 架构演进同步器。把已归档 change 的 DESIGN.md §9 架构沉淀
   同步到项目级文档（CONTEXT.md + ARCHITECTURE.md）。只读 §9，只 patch 文档，不动业务代码。
+  GitNexus MCP 可用时用于检测代码与文档之间的偏差（新抽象未入索引、ADR 与实际代码不一致）。
   Use when 用户说"同步架构/整理沉淀/sediment/evolve/架构演进/同步 CONTEXT"，或每月/每季度批量同步时。
 paradigm: philosopher
 trigger:
@@ -76,6 +77,8 @@ trigger:
 | `src/utils/date-fmt.ts` | 日期格式化 | add-notifications | 沿用 | ⚠️ 与既有 `src/utils/date.ts` 重复 |
 
 **冲突检测必跑**：每条新抽象 grep CONTEXT.md「既有抽象索引」段是否已有同类 → 有则标 ⚠️。
+
+**GitNexus 路径（可选）**：对每条新抽象调用 `gitnexus_context(name="<抽象名>")`，验证符号在代码中确实存在且仍活跃（不是已删除的过时条目）。如果符号不在 GitNexus 图中 → 标 ⚠️ "代码中可能已不存在"。
 
 #### 3.2 项目级技术决策（聚合）
 
